@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --panel-bg: #2d2d2d;
+            --btn-bg: #353535;
+            --accent: #00d4ff;
+            --danger: #ff4d4d;
+            --success: #34c759;
+            --text: #e0e0e0;
+            --no-sign-color: #ffeb3b;
+            --shd-inset: inset 4px 4px 8px #1a1a1a, inset -4px -4px 8px #404040;
+            --shd-btn: 6px 6px 12px #181818, -3px -3px 8px #454545;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            margin: 0; padding: 0;
+            background-color: #222;
+            color: var(--text);
+            font-family: -apple-system, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+
+        .toolbar-container {
+            padding: 10px 12px;
+            background-color: var(--panel-bg);
+            border-bottom: 2px solid #1a1a1a;
+            direction: rtl;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .tool-row-fixed { 
+            display: grid; 
+            grid-template-columns: repeat(5, 1fr); 
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-container { 
+            flex: 1; 
+            padding: 15px; 
+            background-color: #1e1e1e; 
+            display: flex; 
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #arabicInput {
+            width: 100%; 
+            height: 100%;
+            background-color: #181818;
+            color: #fff;
+            border-radius: 18px;
+            border: 2px solid #121212;
+            padding: 20px; 
+            font-size: 18px;
+            direction: rtl; 
+            outline: none;
+            line-height: 2.5; 
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            box-shadow: var(--shd-inset);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        #signPad {
+            display: none;
+            position: absolute;
+            bottom: 10%; 
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 25px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6), 0 0 0 1px #3d3d3d;
+            direction: rtl;
+            width: 90%;
+            max-width: 400px;
+            z-index: 200;
+        }
+
+        .grid-signs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            height: 55px;
+            border: 1px solid #222;
+            border-radius: 14px;
+            background: linear-gradient(145deg, #3a3a3a, #2b2b2b);
+            box-shadow: var(--shd-btn);
+            color: var(--text);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        button:active { box-shadow: var(--shd-inset); transform: scale(0.96); }
+
+        .sign-btn { 
+            color: var(--accent); 
+            font-size: 65px; 
+            font-weight: bold; 
+            overflow: visible;
+        }
+        
+        .space-btn { 
+            grid-column: span 4; 
+            width: 100%; 
+            height: 45px; 
+            background: linear-gradient(145deg, #333, #282828);
+            border-radius: 30px;
+        }
+
+        .ios-switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .ios-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        .no-sign { color: var(--no-sign-color); }
+        .active-letter { border-bottom: 4px solid var(--accent); background: rgba(0,212,255,0.15); border-radius: 4px 4px 0 0; }
+        .zoomed-word { font-size: 50px; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); }
+        .active-shadda { background: var(--success) !important; color: white !important; }
+
+        .signature {
+            text-align: center;
+            font-size: 10px;
+            padding: 5px;
+            color: #555;
+            background: #1e1e1e;
+        }
+
+        #copyToast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--success);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        #copyToast.show { transform: translateX(-50%) translateY(0); }
+    </style>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#f5b038">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+
+    <div class="toolbar-container">
+        <div class="tool-row-fixed">
+            <button onclick="copyText()">📋</button>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <label class="ios-switch">
+                    <input type="checkbox" id="lockKeyboard" onchange="toggleKeyboardLock()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button onclick="speakText()">🔊</button>
+            <button id="clearBtn" onclick="confirmClear()">🗑️</button>
+            <button style="color: var(--danger); font-weight: bold;" onmousedown="backAndRemoveSign(); event.preventDefault();">⌫</button>
+        </div>
+    </div>
+
+    <div class="input-container">
+        <div id="arabicInput" contenteditable="true" inputmode="text" oninput="processText()" onmouseup="processText()" onkeydown="handleKeyDown(event)" spellcheck="false"></div>
+
+        <div id="signPad">
+            <div class="grid-signs">
+                <button class="sign-btn" id="shaddaBtn" onmousedown="toggleShadda(); event.preventDefault();">ّ</button>
+                <button class="sign-btn" onmousedown="handleInput('َ'); event.preventDefault();">َ</button>
+                <button class="sign-btn" onmousedown="handleInput('ُ'); event.preventDefault();">ُ</button>
+                <button class="sign-btn" onmousedown="handleInput('ِ'); event.preventDefault();">ِ</button>
+                <button class="sign-btn" onmousedown="handleInput('ْ'); event.preventDefault();">ْ</button>
+                <button class="sign-btn" onmousedown="handleInput('ً'); event.preventDefault();">ً</button>
+                <button class="sign-btn" onmousedown="handleInput('ٌ'); event.preventDefault();">ٌ</button>
+                <button class="sign-btn" onmousedown="handleInput('ٍ'); event.preventDefault();">ٍ</button>
+                <button class="space-btn" onmousedown="moveNext(); event.preventDefault();"></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="copyToast">تم نسخ النص بنجاح</div>
+    <div class="signature">Made by Laiche Brahim 2026 Paris</div>
+
+<script>
+    let isShaddaActive = false;
+    let clearStep = 0;
+    const tashkeelRegex = /[\u064B-\u0652]/;
+
+    function toggleKeyboardLock() {
+        const isLocked = document.getElementById('lockKeyboard').checked;
+        const area = document.getElementById('arabicInput');
+        const pad = document.getElementById('signPad');
+        area.setAttribute('inputmode', isLocked ? 'none' : 'text');
+        pad.style.display = isLocked ? 'block' : 'none';
+        if(isLocked) processText();
+        area.focus();
+    }
+
+    function toggleShadda() {
+        isShaddaActive = !isShaddaActive;
+        document.getElementById('shaddaBtn').classList.toggle('active-shadda', isShaddaActive);
+    }
+
+    function handleInput(char) {
+        let val = isShaddaActive ? 'ّ' + char : char;
+        insertSign(val);
+        isShaddaActive = false;
+        document.getElementById('shaddaBtn').classList.remove('active-shadda');
+    }
+
+    function getCaretPosition(element) {
+        let caretOffset = 0;
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const preCaretRange = range.cloneRange();
+            preCaretRange.selectNodeContents(element);
+            preCaretRange.setEnd(range.endContainer, range.endOffset);
+            caretOffset = preCaretRange.toString().length;
+        }
+        return caretOffset;
+    }
+
+    function setCaretPosition(element, pos) {
+        const range = document.createRange();
+        const sel = window.getSelection();
+        let currentPos = 0;
+        const nodeStack = [element];
+        let node, found = false;
+        while (nodeStack.length > 0 && !found) {
+            node = nodeStack.pop();
+            if (node.nodeType === 3) {
+                const nextPos = currentPos + node.length;
+                if (pos >= currentPos && pos <= nextPos) {
+                    range.setStart(node, pos - currentPos);
+                    range.collapse(true);
+                    sel.removeAllRanges(); sel.addRange(range);
+                    found = true;
+                }
+                currentPos = nextPos;
+            } else {
+                for (let i = node.childNodes.length - 1; i >= 0; i--) nodeStack.push(node.childNodes[i]);
+            }
+        }
+    }
+
+    function scrollToActiveWord() {
+        const activeSpan = document.querySelector('.active-letter');
+        if (activeSpan) activeSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function handleKeyDown(event) {
+        if (event.key === "Enter") {
+            // Force l'insertion du saut de ligne manuel pour éviter le bug du zoom
+            event.preventDefault();
+            const area = document.getElementById('arabicInput');
+            let pos = getCaretPosition(area);
+            let text = area.innerText;
+            area.innerText = text.substring(0, pos) + "\n" + text.substring(pos);
+            processText();
+            setCaretPosition(area, pos + 1);
+        }
+    }
+
+    function processText() {
+        const area = document.getElementById('arabicInput');
+        let caretPos = getCaretPosition(area);
+        const text = area.innerText;
+
+        let startWord = caretPos;
+        while (startWord > 0 && text[startWord - 1] !== " " && text[startWord - 1] !== "\n") startWord--;
+        let endWord = caretPos;
+        while (endWord < text.length && text[endWord] !== " " && text[endWord] !== "\n") endWord++;
+
+        let html = "";
+        let currentWordHtml = "";
+
+        for (let i = 0; i < text.length; i++) {
+            let char = text[i];
+            let isInsideWord = (i >= startWord && i < endWord && text[caretPos-1] !== " " && text[caretPos-1] !== "\n");
+
+            let content = (char === "\n") ? "\n" : char;
+            if (!tashkeelRegex.test(char) && char !== " " && char !== "\n") {
+                let hasSign = (i + 1 < text.length && tashkeelRegex.test(text[i + 1]));
+                let className = hasSign ? "" : "no-sign";
+                if (i === caretPos - 1) className += " active-letter";
+                content = `<span class="${className}">${char}</span>`;
+            }
+
+            if (isInsideWord && char !== "\n") {
+                currentWordHtml += content;
+                if (i === endWord - 1 || text[i+1] === "\n") {
+                    html += `<span class="zoomed-word">${currentWordHtml}</span>`;
+                    currentWordHtml = "";
+                }
+            } else {
+                html += content;
+            }
+        }
+        
+        area.innerHTML = html || "";
+        setCaretPosition(area, Math.min(caretPos, area.innerText.length));
+        if(document.getElementById('lockKeyboard').checked) scrollToActiveWord();
+    }
+
+    function insertSign(val) {
+        const area = document.getElementById('arabicInput');
+        let pos = getCaretPosition(area);
+        let text = area.innerText;
+        area.innerText = text.substring(0, pos) + val + text.substring(pos);
+        processText();
+        let newPos = pos + val.length + 1;
+        if (area.innerText[newPos-1] === " ") newPos++;
+        setCaretPosition(area, Math.min(newPos, area.innerText.length));
+        processText();
+    }
+
+    function moveNext() {
+        const area = document.getElementById('arabicInput');
+        let pos = getCaretPosition(area);
+        let text = area.innerText;
+        let nextPos = pos + 1;
+        if (text[nextPos-1] === " " || text[nextPos-1] === "\n") nextPos++;
+        setCaretPosition(area, Math.min(nextPos, text.length));
+        processText();
+    }
+
+    function backAndRemoveSign() {
+        const area = document.getElementById('arabicInput');
+        let pos = getCaretPosition(area);
+        let text = area.innerText;
+        
+        if (pos > 0) {
+            let charBefore = text.charAt(pos - 1);
+            if (tashkeelRegex.test(charBefore)) {
+                area.innerText = text.substring(0, pos - 1) + text.substring(pos);
+                processText();
+                setCaretPosition(area, pos - 1);
+            } else {
+                let newPos = pos - 1;
+                if (text[newPos-1] === " " || text[newPos-1] === "\n") newPos = Math.max(0, newPos - 1);
+                setCaretPosition(area, newPos);
+            }
+            processText();
+        }
+    }
+
+    function copyText() {
+        const text = document.getElementById('arabicInput').innerText;
+        navigator.clipboard.writeText(text);
+        const toast = document.getElementById('copyToast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    function speakText() {
+        const text = document.getElementById('arabicInput').innerText;
+        if (text) {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'ar-SA';
+            window.speechSynthesis.speak(msg);
+        }
+    }
+
+    function confirmClear() {
+        if (clearStep === 0) {
+            document.getElementById('clearBtn').textContent = "❗";
+            clearStep = 1;
+            setTimeout(() => { document.getElementById('clearBtn').textContent = "🗑️"; clearStep = 0; }, 3000);
+        } else {
+            document.getElementById('arabicInput').innerText = "";
+            processText();
+            document.getElementById('clearBtn').textContent = "🗑️";
+            clearStep = 0;
+        }
+    }
+</script>
+
+    <style>
+        #pwaInstallBtn {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #f5b038; color: white; border: none; padding: 12px 24px;
+            border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none; z-index: 10000; font-weight: bold; cursor: pointer;
+        }
+    </style>
+    <button id="pwaInstallBtn">Installer l'application</button>
+    <script>
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('pwaInstallBtn').style.display = 'block';
+        });
+        document.getElementById('pwaInstallBtn').addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                document.getElementById('pwaInstallBtn').style.display = 'none';
+            }
+        });
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error:', err));
+            });
+        }
+    </script>
+</body>
+</html>
